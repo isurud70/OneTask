@@ -1,10 +1,7 @@
 """
 sound.py — OneTask
-Handles all sound effects. Gracefully fails if sound not available.
-Uses pygame for reliable cross-platform audio.
+Uses Kivy's built-in audio — works on Android without pygame.
 """
-
-import os
 
 _sounds = {}
 _available = False
@@ -12,16 +9,15 @@ _available = False
 def init_sounds():
     global _available
     try:
-        import pygame
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+        from kivy.core.audio import SoundLoader
         _available = True
         _load_sounds()
     except Exception as e:
         print(f"[Sound] Audio not available: {e}")
-        _available = False
-
 
 def _load_sounds():
+    import os
+    from kivy.core.audio import SoundLoader
     sound_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'sounds')
     sound_files = {
         'complete': 'complete.wav',
@@ -32,15 +28,11 @@ def _load_sounds():
     for key, filename in sound_files.items():
         path = os.path.join(sound_dir, filename)
         if os.path.exists(path):
-            try:
-                import pygame
-                _sounds[key] = pygame.mixer.Sound(path)
-            except Exception as e:
-                print(f"[Sound] Could not load {filename}: {e}")
-
+            sound = SoundLoader.load(path)
+            if sound:
+                _sounds[key] = sound
 
 def play(sound_name):
-    """Play a sound by name. Silently ignores if unavailable."""
     if not _available:
         return
     try:
