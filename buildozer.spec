@@ -1,26 +1,66 @@
-[app]
-title = OneTask
-package.name = onetask
-package.domain = org.onetask
+name: Build OneTask APK
 
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,wav
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-version = 1.0.0
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
-requirements = python3,kivy==2.3.0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-orientation = portrait
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-android.permissions = VIBRATE
-android.minapi = 31
-android.targetapi = 33
-android.ndk = 25b
-android.sdk = 33
-android.archs = arm64-v8a
+      - name: Force Java 17
+        run: |
+          sudo apt-get install -y openjdk-17-jdk
+          sudo update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+          sudo update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+          java -version
 
-fullscreen = 0
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            cmake libffi-dev libssl-dev libltdl-dev
 
-[buildozer]
-log_level = 2
-warn_on_root = 1
+      - name: Install Python build tools
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install buildozer==1.5.0
+          pip install cython==0.29.33
+
+      - name: Generate sound files
+        run: python generate_sounds.py
+
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: ${{ runner.os }}-buildozer-v2-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-v2-
+
+      - name: Build APK
+        run: yes | buildozer -v android debug 2>&1
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneTask-APK
+          path: bin/*.apk
+          retention-days: 30
